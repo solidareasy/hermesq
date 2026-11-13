@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+.dev.vars.*
+coverage/
+__pycache__/
+*.pyc
+!.dev.vars.example

@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - name: Unit tests (workerd)
+        run: npm test
+      - name: Poller client tests (Python stdlib)
+        run: npm run test:poller
+      - name: Build (wrangler deploy --dry-run)
+        run: npm run build
+
+  integration-test:
+    runs-on: ubuntu-latest
+    needs: checks
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      # test/integration/global-setup.ts starts `wrangler dev --local` and a scripted OAuth provider,
+      # waits for /health, and stops both at the end.
+      - name: Integration tests (wrangler dev --local)
+        run: npm run test:integration
+
+  mutation:
+    runs-on: ubuntu-latest
+    needs: checks
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Every mechanism has a test that fails when it breaks
+        run: npm run test:mutation

@@ -1,0 +1,59 @@
+{
+  "name": "hermesq",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Webhook relay on Cloudflare Workers: providers POST to the Worker, your agent host only polls outbound. No open ports.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build": "wrangler deploy --dry-run --outdir dist --env=''",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
+    "test": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:poller": "python3 -I -m unittest discover -s hermes-plugin/tests -p 'test_transfer_client.py'",
+    "test:mutation": "node scripts/mutation-check.mjs",
+    "test:plugin": "sh -c '\"${HERMES_PYTHON:-python3}\" -I -m unittest discover -s hermes-plugin/tests -p test_adapter.py'",
+    "seed": "tsx scripts/seed_subscriptions.ts",
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+  },
+  "dependencies": {
+    "hono": "^4.13.17"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.6.1",
+    "@cloudflare/workers-types": "^5.20261110.1",
+    "@eslint/js": "^9.39.0",
+    "@types/node": "^24.0.0",
+    "eslint": "^9.39.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.2",
+    "vitest": "^5.1.0",
+    "wait-on": "^9.5.1",
+    "wrangler": "^4.159.0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "cloudflare": {
+    "bindings": {
+      "ADMIN_TOKEN": {
+        "description": "Password for the /setup wizard and the admin endpoints. Use a long random string (for example `openssl rand -hex 32`)."
+      },
+      "EVENT_STORE": {
+        "description": "Event records, delivery records and the subscription list."
+      },
+      "DB": {
+        "description": "Ordered delivery log for the poller, deduplication index and audit trail."
+      }
+    }
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "esbuild@0.28.1": true,
+    "workerd@1.20261109.1": true
+  }
+}

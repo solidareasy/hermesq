@@ -1,0 +1,70 @@
+// Canonical Worker config (the Deploy to Cloudflare button reads this file).
+// KV and D1 have no ids on purpose: the Deploy button and `wrangler deploy` provision them.
+// Secrets are never here: ADMIN_TOKEN (asked at deploy), the rest through /setup or `wrangler secret put`.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hermesq",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "vars": {
+    "HERMES_LONG_POLL_MS": "5000",
+    "HERMES_LEASE_SECONDS": "300",
+    "MAX_ATTEMPTS": "3"
+  },
+  "kv_namespaces": [{ "binding": "EVENT_STORE" }],
+  "d1_databases": [{ "binding": "DB", "database_name": "hermesq" }],
+  "durable_objects": { "bindings": [{ "name": "OAUTH_STORE", "class_name": "OAuthStore" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["OAuthStore"] }],
+  "triggers": { "crons": ["0 * * * *"] },
+  "queues": {
+    "producers": [
+      { "binding": "EVENT_QUEUE_GITHUB", "queue": "webhook-github" },
+      { "binding": "EVENT_QUEUE_LINEAR", "queue": "webhook-linear" },
+      { "binding": "EVENT_QUEUE_STRIPE", "queue": "webhook-stripe" },
+      { "binding": "EVENT_QUEUE_SLACK", "queue": "webhook-slack" },
+      { "binding": "HERMES_QUEUE", "queue": "hermes-deliveries" }
+    ],
+    "consumers": [
+      { "queue": "webhook-github", "max_batch_size": 10, "max_batch_timeout": 1, "max_retries": 10 },
+      { "queue": "webhook-linear", "max_batch_size": 10, "max_batch_timeout": 1, "max_retries": 10 },
+      { "queue": "webhook-stripe", "max_batch_size": 10, "max_batch_timeout": 1, "max_retries": 10 },
+      { "queue": "webhook-slack", "max_batch_size": 10, "max_batch_timeout": 1, "max_retries": 10 },
+      { "queue": "hermes-deliveries", "max_batch_size": 10, "max_batch_timeout": 1, "max_retries": 10 }
+    ]
+  },
+  "env": {
+    // `wrangler deploy --env staging` (cd.yml). Bindings are not inherited, so they are repeated with their own names.
+    "staging": {
+      "name": "hermesq-staging",
+      "vars": {
+        "HERMES_LONG_POLL_MS": "5000",
+        "HERMES_LEASE_SECONDS": "300",
+        "MAX_ATTEMPTS": "3"
+      },
+      "kv_namespaces": [{ "binding": "EVENT_STORE" }],
+      "d1_databases": [{ "binding": "DB", "database_name": "hermesq-staging" }],
+      "durable_objects": { "bindings": [{ "name": "OAUTH_STORE", "class_name": "OAuthStore" }] },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["OAuthStore"] }],
+      "triggers": { "crons": ["0 * * * *"] },
+      "queues": {
+        "producers": [
+          { "binding": "EVENT_QUEUE_GITHUB", "queue": "webhook-github-staging" },
+          { "binding": "EVENT_QUEUE_LINEAR", "queue": "webhook-linear-staging" },
+          { "binding": "EVENT_QUEUE_STRIPE", "queue": "webhook-stripe-staging" },
+          { "binding": "EVENT_QUEUE_SLACK", "queue": "webhook-slack-staging" },
+          { "binding": "HERMES_QUEUE", "queue": "hermes-deliveries-staging" }
+        ],
+        "consumers": [
+          { "queue": "webhook-github-staging", "max_batch_size": 10, "max_batch_timeout": 1, "max_retries": 10 },
+          { "queue": "webhook-linear-staging", "max_batch_size": 10, "max_batch_timeout": 1, "max_retries": 10 },
+          { "queue": "webhook-stripe-staging", "max_batch_size": 10, "max_batch_timeout": 1, "max_retries": 10 },
+          { "queue": "webhook-slack-staging", "max_batch_size": 10, "max_batch_timeout": 1, "max_retries": 10 },
+          { "queue": "hermes-deliveries-staging", "max_batch_size": 10, "max_batch_timeout": 1, "max_retries": 10 }
+        ]
+      }
+    }
+  }
+}

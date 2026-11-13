@@ -1,0 +1,109 @@
+name: CD
+
+# staging: every push to main (after CI). production: manual, through the `production` GitHub
+# Environment, whose required reviewer approves the run. Only CLOUDFLARE_API_TOKEN and
+# CLOUDFLARE_ACCOUNT_ID come from the Environment; every other secret is set through /setup.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Deploy action'
+        required: true
+        type: choice
+        options: [install, update, uninstall]
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options: [staging, production]
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: cd-${{ inputs.environment || 'staging' }}
+  cancel-in-progress: false
+
+env:
+  TARGET: ${{ inputs.environment || 'staging' }}
+  ACTION: ${{ inputs.action || 'update' }}
+
+jobs:
+  ci:
+    if: (inputs.action || 'update') != 'uninstall'
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: ci
+    if: (inputs.action || 'update') != 'uninstall'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: ${{ inputs.environment || 'staging' }}
+      url: ${{ vars.WORKER_URL }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Create missing queues (KV and D1 are provisioned by wrangler deploy)
+        run: node scripts/ensure-queues.mjs "$TARGET"
+      - name: Deploy
+        run: |
+          if [ "$TARGET" = "production" ]; then
+            npx wrangler deploy --env=""
+          else
+            npx wrangler deploy --env "$TARGET"
+          fi
+      - name: Verify deployment
+        env:
+          WORKER_URL: ${{ vars.WORKER_URL }}
+        run: |
+          test -n "$WORKER_URL" || { echo "Set the WORKER_URL variable on the $TARGET environment"; exit 1; }
+          for _ in 1 2 3 4 5 6; do
+            if curl -fsS "$WORKER_URL/health"; then exit 0; fi
+            sleep 10
+          done
+          echo "health check failed: $WORKER_URL/health"
+          exit 1
+
+  uninstall:
+    if: inputs.action == 'uninstall'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: ${{ inputs.environment }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Delete the Worker (KV, D1 and Queues are kept; delete them in the dashboard if you want them gone)
+        run: |
+          if [ "$TARGET" = "production" ]; then
+            npx wrangler delete --env="" --force
+          else
+            npx wrangler delete --env "$TARGET" --force
+          fi
+      - name: Verify the Worker is gone
+        env:
+          WORKER_URL: ${{ vars.WORKER_URL }}
+        run: |
+          test -n "$WORKER_URL" || exit 0
+          sleep 10
+          code=$(curl -s -o /dev/null -w '%{http_code}' "$WORKER_URL/health")
+          echo "GET /health -> $code"
+          test "$code" != "200"

@@ -1,0 +1,28 @@
+name: hermesq
+label: hermesQ
+kind: platform
+version: 0.1.0
+description: >
+  Receives GitHub, Linear, Stripe and Slack webhooks through a Cloudflare Worker
+  (hermesQ). The Worker verifies signatures, deduplicates and queues
+  the events; this plugin long-polls it over outbound HTTPS from inside the gateway, runs
+  each delivery as an agent turn and acks it. No port is opened on the Hermes host.
+license: MIT
+requires_env:
+  - name: HERMESQ_URL
+    description: "Base URL of your Worker (e.g. https://hermesq.<you>.workers.dev)"
+    prompt: "Worker URL"
+    password: false
+  - name: HERMESQ_SECRET
+    description: "HERMES_WEBHOOK_SECRET shown once by the Worker's /setup page"
+    prompt: "Shared secret"
+    password: true
+optional_env:
+  - name: HERMESQ_CONSUMER
+    description: "Stable id of this host (deliveries are leased per consumer); default hermes-<hostname>"
+    prompt: "Consumer id (or empty)"
+    password: false
+  - name: HERMESQ_POLL_LIMIT
+    description: "Deliveries per poll (1-50, default 10)"
+    prompt: "Poll limit (or empty)"
+    password: false
