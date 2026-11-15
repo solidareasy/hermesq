@@ -187,10 +187,26 @@ refreshes due OAuth tokens, returns expired leases to the queue and prunes the 7
 
 ### Monitor
 
-`scripts/watch.ts` is a cron-friendly check that prints nothing when healthy. It calls `/health` and reads the last 50 deliveries; it reports `failed`, `dead-letter` and anything `pending`/`processing` for more than 10 minutes. No build, Node >= 22.18:
+The plugin ships `hermes hermesq watch`, a cron-friendly check (no LLM) that prints nothing and exits 0 when
+healthy. It calls `/health` and reads the last 50 deliveries; it prints one line and exits 1 on `failed`,
+`dead-letter` or anything `pending`/`processing` for more than 10 minutes. It needs Node >= 22.18 (it runs
+`hermes-plugin/watch.ts` with type stripping, no build), `HERMESQ_URL` and the admin token
+(`HERMESQ_ADMIN_TOKEN`, or `HERMESQ_ADMIN_TOKEN_FILE`, default `~/.config/hermesq/admin_token`).
+
+It runs from a host cron, outside the gateway, so it still alerts when the gateway is down. A Hermes cron
+script must be a regular file inside `~/.hermes/scripts/` (a symlink pointing outside is refused):
 
 ```sh
-HERMESQ_URL=https://<your-worker> HERMESQ_ADMIN_TOKEN_FILE=~/.config/hermesq/admin_token node scripts/watch.ts
+# install: the plugin + one cron
+hermes plugins install https://github.com/solidareasy/hermesq#hermes-plugin
+printf '#!/bin/sh\nexec hermes hermesq watch\n' > ~/.hermes/scripts/hermesq-watch.sh
+chmod +x ~/.hermes/scripts/hermesq-watch.sh
+hermes cron create every 10m --name hermesq-watch --script hermesq-watch.sh --no-agent --deliver origin
+
+# uninstall
+hermes cron remove <id>   # id from `hermes cron list`
+rm ~/.hermes/scripts/hermesq-watch.sh
+hermes plugins remove hermesq
 ```
 
 ## CI/CD (for forks that deploy from GitHub Actions)
