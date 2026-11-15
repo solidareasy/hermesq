@@ -46,6 +46,7 @@ from gateway.platforms.base import BasePlatformAdapter, SendResult
 from gateway.platforms.event import MessageEvent, MessageType
 
 from . import transfer_client as tc
+from .cli import register_cli
 
 logger = logging.getLogger(__name__)
 
@@ -366,3 +367,4 @@ def register(ctx) -> None:
             "Your final answer is delivered to the subscription's target (a log, or a chat). Be concise."
         ),
     )
+    register_cli(ctx)

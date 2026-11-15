@@ -12,5 +12,5 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["test/integration/**/*.ts", "test/fixtures/**/*.ts", "scripts/**/*.ts", "vitest.config.ts"]
+  "include": ["test/integration/**/*.ts", "test/fixtures/**/*.ts", "scripts/**/*.ts", "hermes-plugin/**/*.ts", "vitest.config.ts"]
 }
